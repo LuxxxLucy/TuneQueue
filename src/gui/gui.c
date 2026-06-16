@@ -316,7 +316,7 @@ static void track_row(const struct video *v, int liked, int playing, int index,
                                           : (Clay_Color){ 0, 0, 0, 0 },
                    .cornerRadius = CLAY_CORNER_RADIUS(13) })
             {
-                text(CLAY_STRING("▶"), 11, DIM);
+                text(CLAY_STRING("▶"), 16, DIM);
             }
             if (removable) {
                 CLAY(delId,
@@ -329,7 +329,7 @@ static void track_row(const struct video *v, int liked, int playing, int index,
                                               : (Clay_Color){ 0, 0, 0, 0 },
                        .cornerRadius = CLAY_CORNER_RADIUS(13) })
                 {
-                    text(CLAY_STRING("×"), 15,
+                    text(CLAY_STRING("×"), 18,
                          Clay_PointerOver(delId) ? ACCENT_TEXT : FAINT);
                 }
             }
@@ -343,7 +343,7 @@ static void icon_button(const char *id_str, Clay_String glyph, int size,
     Clay_ElementId id = (Clay_ElementId)Clay_GetElementId(
         (Clay_String){ .length = (int)strlen(id_str), .chars = id_str });
     int hover = Clay_PointerOver(id);
-    int dim = big ? 44 : 30;
+    int dim = big ? 52 : size + 12;
     Clay_Color bgc =
         big ? ACCENT : (hover ? SURFACE3 : (Clay_Color){ 0, 0, 0, 0 });
     Clay_Color fg = big ? WHITEC : (active ? ACCENT_TEXT : DIM);
@@ -599,13 +599,13 @@ static void build_transport(void)
                           .childAlignment = { CLAY_ALIGN_X_CENTER,
                                               CLAY_ALIGN_Y_CENTER } } })
         {
-            icon_button("restartBtn", CLAY_STRING("↺"), 16, 0, 0);
+            icon_button("restartBtn", CLAY_STRING("↺"), 26, 0, 0);
             Clay_String play_glyph = app.player.status == PS_LOADING ? spinner()
                                      : app.player.status == PS_PLAYING
                                          ? CLAY_STRING("II")
                                          : CLAY_STRING("▶");
-            icon_button("playBtn", play_glyph, 18, 0, 1);
-            icon_button("nextBtn", CLAY_STRING("▶▶"), 12, 0, 0);
+            icon_button("playBtn", play_glyph, 30, 0, 1);
+            icon_button("nextBtn", CLAY_STRING("▶▶"), 22, 0, 0);
             // until a real playback position arrives (cued, or still
             // loading after pressing play), hold the cursor at the resume point
             double pos = app.player.position, dur = app.player.duration;
@@ -662,7 +662,7 @@ static void build_transport(void)
                 {
                 }
             }
-            icon_button("settingsBtn", CLAY_STRING("⚙"), 16, 0, 0);
+            icon_button("settingsBtn", CLAY_STRING("⚙"), 26, 0, 0);
         }
     }
 }
