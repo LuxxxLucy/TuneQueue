@@ -219,6 +219,11 @@ struct queue_list db_list_queue(sqlite3 *db)
     return l;
 }
 
+int db_remove_from_queue(sqlite3 *db, const char *video_id)
+{
+    return exec_text(db, "DELETE FROM queue_items WHERE video_id=?1", video_id);
+}
+
 void queue_list_free(struct queue_list *l)
 {
     for (int i = 0; i < l->count; i++) {

@@ -89,6 +89,13 @@ struct add_result app_add_urls(struct tune_queue_app_state *a,
     return r;
 }
 
+void app_remove_from_queue(struct tune_queue_app_state *a, const char *video_id)
+{
+    if (db_remove_from_queue(a->db, video_id) == 0) {
+        a->dirty = 1;
+    }
+}
+
 void app_set_like(struct tune_queue_app_state *a, const char *video_id,
                   int liked)
 {

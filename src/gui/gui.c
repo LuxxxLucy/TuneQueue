@@ -236,11 +236,12 @@ static void thumb_box(Clay_ElementId id, const char *vid, const char *url,
 }
 
 static void track_row(const struct video *v, int liked, int playing, int index,
-                      int show_dur, int has_resume)
+                      int show_dur, int has_resume, int removable)
 {
     Clay_ElementId rid = idi("row", index);
     Clay_ElementId likeId = idi("like", index);
     Clay_ElementId playId = idi("play", index);
+    Clay_ElementId delId = idi("del", index);
     Clay_Color bg =
         playing
             ? ACCENT_SOFT
@@ -310,6 +311,21 @@ static void track_row(const struct video *v, int liked, int playing, int index,
                    .cornerRadius = CLAY_CORNER_RADIUS(13) })
             {
                 text(CLAY_STRING("▶"), 11, DIM);
+            }
+            if (removable) {
+                CLAY(delId,
+                     { .layout = { .sizing = { CLAY_SIZING_FIXED(26),
+                                               CLAY_SIZING_FIXED(26) },
+                                   .childAlignment = { CLAY_ALIGN_X_CENTER,
+                                                       CLAY_ALIGN_Y_CENTER } },
+                       .backgroundColor = Clay_PointerOver(delId)
+                                              ? SURFACE3
+                                              : (Clay_Color){ 0, 0, 0, 0 },
+                       .cornerRadius = CLAY_CORNER_RADIUS(13) })
+                {
+                    text(CLAY_STRING("×"), 15,
+                         Clay_PointerOver(delId) ? ACCENT_TEXT : FAINT);
+                }
             }
         }
     }
@@ -382,14 +398,15 @@ static void build_list(void)
                 struct queue_item *it = &app.queue.items[i];
                 int playing =
                     app.has_now && strcmp(app.now.id, it->video.id) == 0;
-                track_row(&it->video, it->liked, playing, i, 1, it->has_resume);
+                track_row(&it->video, it->liked, playing, i, 1, it->has_resume,
+                          1);
             }
         } else if (view == VIEW_LIKED) {
             if (app.liked.count == 0) {
                 text(CLAY_STRING("No liked videos yet."), 13, FAINT);
             }
             for (int i = 0; i < app.liked.count; i++) {
-                track_row(&app.liked.items[i].video, 1, 0, i, 1, 0);
+                track_row(&app.liked.items[i].video, 1, 0, i, 1, 0, 0);
             }
         } else {
             CLAY_AUTO_ID({ .layout = { .sizing = { CLAY_SIZING_GROW(0) },
@@ -426,7 +443,7 @@ static void build_list(void)
             }
             for (int i = 0; i < app.history.count; i++) {
                 track_row(&app.history.items[i].video,
-                          app.history.items[i].liked, 0, i, 1, 0);
+                          app.history.items[i].liked, 0, i, 1, 0, 0);
             }
         }
     }
@@ -1028,7 +1045,9 @@ static void handle_clicks(void)
         int liked;
         struct queue_item *qi;
         const struct video *v = view_row(i, &liked, &qi);
-        if (hit(idi("like", i))) {
+        if (qi && hit(idi("del", i))) {
+            app_remove_from_queue(&app, v->id);
+        } else if (hit(idi("like", i))) {
             app_set_like(&app, v->id, !liked);
         } else if (hit(idi("play", i)) || hit(idi("row", i))) {
             if (qi) {

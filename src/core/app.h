@@ -51,6 +51,8 @@ int app_take_dirty(struct tune_queue_app_state *a);  // true once after a change
 
 struct add_result app_add_urls(struct tune_queue_app_state *a,
                                const char **urls, int n);
+void app_remove_from_queue(struct tune_queue_app_state *a,
+                           const char *video_id);
 void app_set_like(struct tune_queue_app_state *a, const char *video_id,
                   int liked);
 int app_set_api_key(struct tune_queue_app_state *a, const char *key, char *err,
