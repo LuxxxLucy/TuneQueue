@@ -34,6 +34,8 @@ void queue_list_free(struct queue_list *l);
 struct add_result db_add_to_queue(sqlite3 *db, const char **urls, int n);
 int db_remove_from_queue(sqlite3 *db,
                          const char *video_id);  // nonzero on failure
+// renumber queue positions to match the given video_id order
+int db_reorder_queue(sqlite3 *db, const char **video_ids, int n);
 
 void db_abandon_open_sessions(sqlite3 *db, const char *video_id);
 long long db_start_session(sqlite3 *db, const char *video_id);  // -1 if unknown

@@ -53,6 +53,8 @@ struct add_result app_add_urls(struct tune_queue_app_state *a,
                                const char **urls, int n);
 void app_remove_from_queue(struct tune_queue_app_state *a,
                            const char *video_id);
+void app_reorder_queue(struct tune_queue_app_state *a, const char **video_ids,
+                       int n);
 void app_set_like(struct tune_queue_app_state *a, const char *video_id,
                   int liked);
 int app_set_api_key(struct tune_queue_app_state *a, const char *key, char *err,

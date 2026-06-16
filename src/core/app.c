@@ -96,6 +96,14 @@ void app_remove_from_queue(struct tune_queue_app_state *a, const char *video_id)
     }
 }
 
+void app_reorder_queue(struct tune_queue_app_state *a, const char **video_ids,
+                       int n)
+{
+    if (db_reorder_queue(a->db, video_ids, n) == 0) {
+        a->dirty = 1;
+    }
+}
+
 void app_set_like(struct tune_queue_app_state *a, const char *video_id,
                   int liked)
 {

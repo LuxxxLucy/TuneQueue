@@ -224,6 +224,23 @@ int db_remove_from_queue(sqlite3 *db, const char *video_id)
     return exec_text(db, "DELETE FROM queue_items WHERE video_id=?1", video_id);
 }
 
+int db_reorder_queue(sqlite3 *db, const char **video_ids, int n)
+{
+    sqlite3_exec(db, "BEGIN", 0, 0, 0);
+    sqlite3_stmt *st;
+    sqlite3_prepare_v2(
+        db, "UPDATE queue_items SET position=?1 WHERE video_id=?2", -1, &st, 0);
+    for (int i = 0; i < n; i++) {
+        sqlite3_bind_int(st, 1, i + 1);
+        sqlite3_bind_text(st, 2, video_ids[i], -1, SQLITE_STATIC);
+        sqlite3_step(st);
+        sqlite3_reset(st);
+    }
+    sqlite3_finalize(st);
+    sqlite3_exec(db, "COMMIT", 0, 0, 0);
+    return 0;
+}
+
 void queue_list_free(struct queue_list *l)
 {
     for (int i = 0; i < l->count; i++) {

@@ -62,6 +62,11 @@ static char msg[256];
 static int error_open;
 static char error_msg[256];
 static double frames_due;  // playing seconds until the next still
+// queue drag-to-reorder state
+static int drag_pending;  // mouse down on a queue row, may become a drag
+static int drag_active;   // movement passed the threshold; a drag is underway
+static char drag_id[16];  // video id being dragged
+static float drag_press_y;
 static Font fonts[1];
 static const char *font_path;  // the UI font file, from the app config
 
@@ -242,8 +247,9 @@ static void track_row(const struct video *v, int liked, int playing, int index,
     Clay_ElementId likeId = idi("like", index);
     Clay_ElementId playId = idi("play", index);
     Clay_ElementId delId = idi("del", index);
+    int dragging = drag_active && removable && strcmp(v->id, drag_id) == 0;
     Clay_Color bg =
-        playing
+        (dragging || playing)
             ? ACCENT_SOFT
             : (Clay_PointerOver(rid) ? SURFACE2 : (Clay_Color){ 0, 0, 0, 0 });
     CLAY(rid,
@@ -859,6 +865,47 @@ static void draw_stage_image(void)
     }
 }
 
+static int row_box(int i, Clay_BoundingBox *out);
+static int queue_index_of(const char *id);
+static int queue_drop_index(float y);
+
+// while reordering, draw the insertion line and a label trailing the cursor
+static void draw_drag_overlay(void)
+{
+    if (!drag_active) {
+        return;
+    }
+    int from = queue_index_of(drag_id);
+    if (from < 0 || app.queue.count == 0) {
+        return;
+    }
+    Clay_BoundingBox b;
+    int drop = queue_drop_index(GetMouseY());
+    float lineY, x0, w;
+    if (drop < app.queue.count && row_box(drop, &b)) {
+        lineY = b.y;
+        x0 = b.x;
+        w = b.width;
+    } else if (row_box(app.queue.count - 1, &b)) {
+        lineY = b.y + b.height;
+        x0 = b.x;
+        w = b.width;
+    } else {
+        return;
+    }
+    DrawRectangle((int)x0, (int)lineY - 1, (int)w, 2,
+                  (Color){ 224, 139, 79, 255 });
+
+    const struct video *v = &app.queue.items[from].video;
+    const char *t = v->title.len ? str_c(&v->title) : v->id;
+    Vector2 m = GetMousePosition();
+    Vector2 ts = MeasureTextEx(fonts[0], t, 14, 0);
+    Rectangle box = { m.x + 12, m.y - 12, ts.x + 16, 26 };
+    DrawRectangleRounded(box, 0.4f, 6, (Color){ 42, 41, 37, 235 });
+    DrawTextEx(fonts[0], t, (Vector2){ box.x + 8, box.y + 6 }, 14, 0,
+               (Color){ 233, 230, 221, 255 });
+}
+
 static void handle_text_input(char *buf, int *len, int cap)
 {
     int c;
@@ -1049,13 +1096,118 @@ static void handle_clicks(void)
             app_remove_from_queue(&app, v->id);
         } else if (hit(idi("like", i))) {
             app_set_like(&app, v->id, !liked);
-        } else if (hit(idi("play", i)) || hit(idi("row", i))) {
+        } else if (hit(idi("play", i)) || (!qi && hit(idi("row", i)))) {
+            // queue rows play on release (handle_queue_drag), so a press-drag
+            // can reorder instead
             if (qi) {
                 app_play_queue_item(&app, qi);
             } else {
                 app_play_video(&app, v, 0);
             }
         }
+    }
+}
+
+static int row_box(int i, Clay_BoundingBox *out)
+{
+    Clay_ElementData d = Clay_GetElementData(idi("row", i));
+    if (!d.found) {
+        return 0;
+    }
+    *out = d.boundingBox;
+    return 1;
+}
+
+static int queue_index_of(const char *id)
+{
+    for (int i = 0; i < app.queue.count; i++) {
+        if (strcmp(app.queue.items[i].video.id, id) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// queue row whose box contains y, or -1
+static int queue_row_at(float y)
+{
+    for (int i = 0; i < app.queue.count; i++) {
+        Clay_BoundingBox b;
+        if (row_box(i, &b) && y >= b.y && y < b.y + b.height) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// insertion slot 0..count for a pointer at y, by row midpoints
+static int queue_drop_index(float y)
+{
+    for (int i = 0; i < app.queue.count; i++) {
+        Clay_BoundingBox b;
+        if (row_box(i, &b) && y < b.y + b.height / 2) {
+            return i;
+        }
+    }
+    return app.queue.count;
+}
+
+static void reorder_drag(int from, int drop)
+{
+    int n = app.queue.count;
+    int tgt = drop > from ? drop - 1 : drop;
+    if (tgt == from) {
+        return;
+    }
+    const char **ids = malloc(n * sizeof(*ids));
+    int k = 0;
+    for (int i = 0; i < n; i++) {
+        if (k == tgt) {
+            ids[k++] = app.queue.items[from].video.id;
+        }
+        if (i != from) {
+            ids[k++] = app.queue.items[i].video.id;
+        }
+    }
+    if (k == tgt) {
+        ids[k++] = app.queue.items[from].video.id;
+    }
+    app_reorder_queue(&app, ids, n);
+    free(ids);
+}
+
+// press/drag/release on queue rows: a drag reorders, a plain click plays
+static void handle_queue_drag(void)
+{
+    if (view != VIEW_QUEUE || add_open || settings_open || error_open) {
+        drag_pending = drag_active = 0;
+        return;
+    }
+    float my = GetMouseY();
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        int i = queue_row_at(my);
+        if (i >= 0 && !Clay_PointerOver(idi("like", i)) &&
+            !Clay_PointerOver(idi("play", i)) &&
+            !Clay_PointerOver(idi("del", i))) {
+            drag_pending = 1;
+            drag_active = 0;
+            drag_press_y = my;
+            snprintf(drag_id, sizeof(drag_id), "%s",
+                     app.queue.items[i].video.id);
+        }
+    }
+    if (drag_pending && IsMouseButtonDown(MOUSE_BUTTON_LEFT) &&
+        fabsf(my - drag_press_y) > 5) {
+        drag_active = 1;
+    }
+    if (drag_pending && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        int from = queue_index_of(drag_id);
+        if (from >= 0 && drag_active) {
+            reorder_drag(from, queue_drop_index(my));
+        } else if (from >= 0) {
+            app_play_queue_item(&app, &app.queue.items[from]);
+        }
+        drag_pending = drag_active = 0;
     }
 }
 
@@ -1172,6 +1324,7 @@ int main(void)
 
         g_clicked = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
         handle_clicks();
+        handle_queue_drag();
 
         thumbs_pump();
         frames_pump();
@@ -1182,6 +1335,7 @@ int main(void)
         if (!add_open && !settings_open && !error_open) {
             draw_stage_image();
         }
+        draw_drag_overlay();
         EndDrawing();
     }
 
