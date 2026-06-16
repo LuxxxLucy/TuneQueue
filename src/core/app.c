@@ -219,6 +219,11 @@ enum tune_queue_app_event app_poll(struct tune_queue_app_state *a, double dt)
     player_poll(&a->player);
 
     if (a->player.status == PS_PLAYING) {
+        // a suspended process resumes with a huge delta; do not credit the gap
+        // as listening time
+        if (dt > TUNE_QUEUE_SLEEP_GAP_SECONDS) {
+            dt = 0;
+        }
         a->watched += dt;
         a->hb_accum += dt;
         if (a->hb_accum >= a->heartbeat_interval) {

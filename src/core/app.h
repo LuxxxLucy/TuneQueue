@@ -8,6 +8,9 @@
 #define TUNE_QUEUE_DEFAULT_HEARTBEAT_INTERVAL 5.0
 #define TUNE_QUEUE_DEFAULT_DATA_DIR "Library/Application Support/TuneQueue"
 #define TUNE_QUEUE_DEFAULT_CACHE_DIR "Library/Caches/TuneQueue"
+// a frame delta this large means the process was suspended (display sleep /
+// GPU switch): skip its listening time and rebuild dropped GL textures
+#define TUNE_QUEUE_SLEEP_GAP_SECONDS 1.0
 
 struct tune_queue_app_config {
     struct {

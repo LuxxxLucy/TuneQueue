@@ -869,6 +869,13 @@ static int row_box(int i, Clay_BoundingBox *out);
 static int queue_index_of(const char *id);
 static int queue_drop_index(float y);
 
+// the palette is defined as Clay_Color; convert for raylib's direct draws
+static Color rl(Clay_Color c)
+{
+    return (Color){ (unsigned char)c.r, (unsigned char)c.g, (unsigned char)c.b,
+                    (unsigned char)c.a };
+}
+
 // while reordering, draw the insertion line and a label trailing the cursor
 static void draw_drag_overlay(void)
 {
@@ -893,17 +900,17 @@ static void draw_drag_overlay(void)
     } else {
         return;
     }
-    DrawRectangle((int)x0, (int)lineY - 1, (int)w, 2,
-                  (Color){ 224, 139, 79, 255 });
+    DrawRectangle((int)x0, (int)lineY - 1, (int)w, 2, rl(ACCENT));
 
     const struct video *v = &app.queue.items[from].video;
     const char *t = v->title.len ? str_c(&v->title) : v->id;
     Vector2 m = GetMousePosition();
     Vector2 ts = MeasureTextEx(fonts[0], t, 14, 0);
     Rectangle box = { m.x + 12, m.y - 12, ts.x + 16, 26 };
-    DrawRectangleRounded(box, 0.4f, 6, (Color){ 42, 41, 37, 235 });
-    DrawTextEx(fonts[0], t, (Vector2){ box.x + 8, box.y + 6 }, 14, 0,
-               (Color){ 233, 230, 221, 255 });
+    Color ghost = rl(SURFACE3);
+    ghost.a = 235;
+    DrawRectangleRounded(box, 0.4f, 6, ghost);
+    DrawTextEx(fonts[0], t, (Vector2){ box.x + 8, box.y + 6 }, 14, 0, rl(TEXT));
 }
 
 static void handle_text_input(char *buf, int *len, int cap)
@@ -1262,6 +1269,14 @@ int main(void)
         }
 
         float dt = GetFrameTime();
+        // a long frame means the display slept; the GL context dropped its
+        // textures, so rebuild the font atlas and re-upload images
+        if (dt > TUNE_QUEUE_SLEEP_GAP_SECONDS) {
+            fonts_dirty = 1;
+            ensure_font();
+            thumbs_reload();
+            frames_reload();
+        }
         enum tune_queue_app_event ev = app_poll(&app, dt);
 
         // reset the still timer whenever the track changes (manual play,

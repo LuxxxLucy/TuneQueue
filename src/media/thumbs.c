@@ -22,6 +22,7 @@ struct entry {
     char key[16];
     char *url;
     int state;
+    int inflight;  // a worker is fetching this entry
     unsigned char *bytes;
     int nbytes;
     Texture2D tex;
@@ -64,7 +65,8 @@ static void thumb_path(const char *key, char *out, int n)
 static int find_pending(void)
 {
     for (int i = 0; i < entry_count; i++) {
-        if (entries[i].state == ST_LOADING && entries[i].url) {
+        if (entries[i].state == ST_LOADING && entries[i].url &&
+            !entries[i].inflight) {
             return i;
         }
     }
@@ -88,9 +90,7 @@ static void *worker_main(void *arg)
         char url[1024], key[16];
         snprintf(url, sizeof(url), "%s", entries[idx].url);
         snprintf(key, sizeof(key), "%s", entries[idx].key);
-        // mark in-flight by clearing url so we don't pick it again
-        free(entries[idx].url);
-        entries[idx].url = NULL;
+        entries[idx].inflight = 1;  // keep the url so the entry can re-queue
         pthread_mutex_unlock(&lock);
 
         char path[1100];
@@ -104,6 +104,7 @@ static void *worker_main(void *arg)
             entries[idx].bytes = disk;
             entries[idx].nbytes = dlen;
             entries[idx].state = ST_BYTES;
+            entries[idx].inflight = 0;
             pthread_mutex_unlock(&lock);
             continue;
         }
@@ -131,6 +132,7 @@ static void *worker_main(void *arg)
             free(m.data);
             entries[idx].state = ST_FAILED;
         }
+        entries[idx].inflight = 0;
         pthread_mutex_unlock(&lock);
     }
     if (c) {
@@ -225,5 +227,24 @@ void thumbs_pump(void)
             entries[i].state = ST_FAILED;
         }
     }
+    pthread_mutex_unlock(&lock);
+}
+
+void thumbs_reload(void)
+{
+    pthread_mutex_lock(&lock);
+    for (int i = 0; i < entry_count; i++) {
+        if (entries[i].has_tex) {
+            UnloadTexture(entries[i].tex);
+            entries[i].has_tex = 0;
+        }
+        // re-decode finished entries from the on-disk cache; leave in-flight
+        // and pending-upload ones to complete normally
+        if (entries[i].state == ST_READY || entries[i].state == ST_FAILED) {
+            entries[i].state = ST_LOADING;
+            entries[i].inflight = 0;
+        }
+    }
+    pthread_cond_signal(&cv);
     pthread_mutex_unlock(&lock);
 }

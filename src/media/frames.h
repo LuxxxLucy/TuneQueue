@@ -13,5 +13,8 @@ Texture2D *frames_get(const char *video_id);
 // upload a finished grab to a GL texture; call once per frame on the main
 // thread
 void frames_pump(void);
+// drop the GL texture after the context loses it (display sleep / GPU switch);
+// the stage falls back to the thumbnail until the next grab arrives
+void frames_reload(void);
 
 #endif

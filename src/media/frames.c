@@ -183,3 +183,11 @@ void frames_pump(void)
     has_tex = 1;
     snprintf(tex_id, sizeof(tex_id), "%s", id);
 }
+
+void frames_reload(void)
+{
+    if (has_tex) {
+        UnloadTexture(tex);
+        has_tex = 0;
+    }
+}
