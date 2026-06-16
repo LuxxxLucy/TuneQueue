@@ -1135,12 +1135,12 @@ static int queue_index_of(const char *id)
     return -1;
 }
 
-// queue row whose box contains y, or -1
-static int queue_row_at(float y)
+// queue row the pointer is over (full hit-test, respects the panel and clip),
+// or -1
+static int queue_row_at(void)
 {
     for (int i = 0; i < app.queue.count; i++) {
-        Clay_BoundingBox b;
-        if (row_box(i, &b) && y >= b.y && y < b.y + b.height) {
+        if (Clay_PointerOver(idi("row", i))) {
             return i;
         }
     }
@@ -1192,7 +1192,7 @@ static void handle_queue_drag(void)
     }
     float my = GetMouseY();
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        int i = queue_row_at(my);
+        int i = queue_row_at();
         if (i >= 0 && !Clay_PointerOver(idi("like", i)) &&
             !Clay_PointerOver(idi("play", i)) &&
             !Clay_PointerOver(idi("del", i))) {
